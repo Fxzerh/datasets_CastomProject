@@ -38,56 +38,88 @@ COLORES_SUPER = {
     "Cencosud (Jumbo/Disco/Vea)": "#FFA15A"
 }
 
+# CSS puntual para ubicar el desplegable de la Sección 1 justo debajo de la leyenda "Supermercado"
+st.markdown("""
+<style>
+div[data-testid="stVerticalBlock"]:has(> div.element-container div#anchor-sec1) + div[data-testid="stVerticalBlock"] {
+    position: relative;
+    z-index: 10;
+    margin-top: -435px;
+    margin-left: 785px;
+    width: 260px;
+    margin-bottom: 340px;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # --- SECCIÓN 1: PRECIO POR SUPERMERCADO POR RUBRO ---
 st.header("1. Comparativa de Precio por Supermercado según Rubro")
 
-col_graf1, col_sel1 = st.columns([3.2, 1])
+# Renderizamos primero el selector para que el gráfico se dibuje al instante con el valor elegido
+col_dummy, _ = st.columns([1, 3])
+with col_dummy:
+    rubro_sec1 = st.selectbox(
+        "Seleccione un Producto:",
+        options=RUBROS_10,
+        index=0,
+        key="select_sec1"
+    )
 
-with col_sel1:
-    # Espaciador vertical para alinear la lengüeta debajo de la leyenda de supermercados
-    st.markdown("<div style='height: 210px;'></div>", unsafe_allow_html=True)
-    with st.container(border=True):
-        st.markdown("**Seleccione un Rubro:**")
-        rubro_sec1 = st.radio(
-            "Rubro (Precio x Supermercado)",
-            options=RUBROS_10,
-            index=0,
-            key="radio_sec1",
-            label_visibility="collapsed"
-        )
+df_rubro1 = df[df['tipo_producto'] == rubro_sec1]
+precio_super = (
+    df_rubro1.groupby('supermercado', as_index=False)
+    .agg(Precio=('precio_lista_ref', 'median'))
+    .sort_values('Precio', ascending=True)
+)
+precio_super.columns = ['Supermercado', 'Precio de Referencia ($)']
 
-with col_graf1:
-    df_rubro1 = df[df['tipo_producto'] == rubro_sec1]
-    precio_super = (
-        df_rubro1.groupby('supermercado', as_index=False)
-        .agg(Precio=('precio_lista_ref', 'median'))
-        .sort_values('Precio', ascending=True)
-    )
-    precio_super.columns = ['Supermercado', 'Precio de Referencia ($)']
+fig_bar = px.bar(
+    precio_super,
+    x='Supermercado',
+    y='Precio de Referencia ($)',
+    color='Supermercado',
+    color_discrete_map=COLORES_SUPER,
+    title=f"Precio Mediano de Referencia (Kg/L) por Cadena — {rubro_sec1}",
+    text_auto='.2f',
+    width=1050,
+    height=650
+)
+fig_bar.update_traces(texttemplate='$%{y:,.2f}', textposition='outside', textfont_size=15)
+fig_bar.update_xaxes(tickangle=45, tickfont=dict(size=14), title_font=dict(size=16))
+fig_bar.update_yaxes(
+    tickfont=dict(size=14),
+    title_font=dict(size=16),
+    range=[0, precio_super['Precio de Referencia ($)'].max() * 1.15]
+)
+fig_bar.update_layout(
+    title_font=dict(size=20),
+    legend=dict(font=dict(size=14), title_font=dict(size=15))
+)
 
-    fig_bar = px.bar(
-        precio_super,
-        x='Supermercado',
-        y='Precio de Referencia ($)',
-        color='Supermercado',
-        color_discrete_map=COLORES_SUPER,
-        title=f"Precio Mediano de Referencia (Kg/L) por Cadena — {rubro_sec1}",
-        text_auto='.2f',
-        width=1050,
-        height=650
-    )
-    fig_bar.update_traces(texttemplate='$%{y:,.2f}', textposition='outside', textfont_size=15)
-    fig_bar.update_xaxes(tickangle=45, tickfont=dict(size=14), title_font=dict(size=16))
-    fig_bar.update_yaxes(
-        tickfont=dict(size=14),
-        title_font=dict(size=16),
-        range=[0, precio_super['Precio de Referencia ($)'].max() * 1.15]
-    )
-    fig_bar.update_layout(
-        title_font=dict(size=20),
-        legend=dict(font=dict(size=14), title_font=dict(size=15))
-    )
+# Contenedor del gráfico + posicionamiento del desplegable justo debajo de "Supermercado"
+with st.container():
     st.plotly_chart(fig_bar, use_container_width=False)
+    st.markdown('<div id="anchor-sec1"></div>', unsafe_allow_html=True)
+
+# Movemos visualmente el selectbox justo debajo de la leyenda derecha del gráfico
+st.markdown("""
+<script>
+const anchor = window.parent.document.getElementById('anchor-sec1');
+if (anchor) {
+    const selectContainer = anchor.closest('[data-testid="stVerticalBlock"]').previousElementSibling;
+    const chartContainer = anchor.closest('[data-testid="stVerticalBlock"]');
+    if (selectContainer && chartContainer) {
+        selectContainer.style.position = 'absolute';
+        selectContainer.style.top = '235px';
+        selectContainer.style.left = '785px';
+        selectContainer.style.width = '250px';
+        selectContainer.style.zIndex = '999';
+        chartContainer.style.position = 'relative';
+        chartContainer.appendChild(selectContainer);
+    }
+}
+</script>
+""", unsafe_allow_html=True)
 
 # --- SECCIÓN 2: DISTRIBUCIONES ---
 st.header("2. Distribuciones de Precios y Ratios")
@@ -131,7 +163,6 @@ features_numericas = [
 col_graf3, col_sel3 = st.columns([2.4, 1])
 
 with col_sel3:
-    # Espaciador vertical debajo de la barra de color del heatmap
     st.markdown("<div style='height: 220px;'></div>", unsafe_allow_html=True)
     with st.container(border=True):
         st.markdown("**Seleccione un Rubro:**")
@@ -145,7 +176,6 @@ with col_sel3:
 
 with col_graf3:
     df_rubro3 = df[df['tipo_producto'] == rubro_sec3]
-    # fillna(0) evita celdas vacías cuando descuento_anunciado es 0 constante en todo el rubro
     corr = df_rubro3[features_numericas].corr().fillna(0)
 
     fig_corr = px.imshow(
@@ -169,7 +199,7 @@ st.header("4. Selección Final de Features (7 Variables)")
 col_lin, col_nolin = st.columns(2)
 
 with col_lin:
-    with st.container(border=True, height=260):
+    with st.container(border=True, height=330):
         st.subheader("📈 Variables Lineales (3)")
         st.markdown("""
         * **`precio_lista_ref`**: Es la mediana del precio común normalizado por Kg o Litro para cada rubro y cadena.
@@ -178,7 +208,7 @@ with col_lin:
         """)
 
 with col_nolin:
-    with st.container(border=True, height=260):
+    with st.container(border=True, height=330):
         st.subheader("⚙️ Variables No Lineales / Ratios (4)")
         st.markdown("""
         * **`ratio_vs_mercado`**: Indica si el precio de lista del súper está más barato (menor a 1) o más caro (mayor a 1) que la mediana del mercado.
